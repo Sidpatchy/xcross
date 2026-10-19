@@ -40,11 +40,7 @@ final class KmpProjectDetector {
     final chosen = candidates.length == 1
         ? candidates.first
         : entries.pickBySwiftImport(root, candidates);
-    final entry = entries.classifyEntry(
-      chosen.modulePath,
-      root,
-      chosen.baseName,
-    );
+    final entry = entries.classifyEntry(chosen.modulePath, root);
     final iosConfig = IosAppConfigLoader(files).load(root);
     final defaults = _defaultIdentity(root);
     return KmpProject(

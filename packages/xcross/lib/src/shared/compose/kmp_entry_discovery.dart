@@ -68,27 +68,14 @@ final class KmpEntryDiscovery {
     );
   }
 
-  static const _allowedSwiftImports = {
-    'SwiftUI',
-    'UIKit',
-    'Foundation',
-    'Combine',
-    'SwiftData',
-    'CoreGraphics',
-    'CoreFoundation',
-    'Observation',
-    'os',
-    'Dispatch',
-  };
-
-  ComposeEntryResult classifyEntry(
-    String modulePath,
-    String projectRoot,
-    String baseName,
-  ) {
+  ComposeEntryResult classifyEntry(String modulePath, String projectRoot) {
     final kotlinEntry = _detectKotlinEntry(modulePath);
-    final swiftEntry = _detectSwiftAppEntry(projectRoot, baseName);
-    if (swiftEntry != null && kotlinEntry == null) return swiftEntry;
+    final swiftEntry = _detectSwiftAppEntry(projectRoot);
+    // A real SwiftUI @main host owns app startup even when the KMP module also
+    // exposes a ComposeUIViewController. In particular, do not fall back to
+    // the generated no-argument Objective-C runner just because the Swift
+    // host imports modules xcross cannot resolve on its own.
+    if (swiftEntry != null) return swiftEntry;
     if (kotlinEntry != null) return kotlinEntry;
     return const ComposeEntryResult(KmpEntryKind.frameworkOnly);
   }
@@ -97,7 +84,7 @@ final class KmpEntryDiscovery {
     final iosMain = files.directory(p.join(modulePath, 'src', 'iosMain'));
     if (!iosMain.existsSync()) return null;
     final pattern = RegExp(
-      r'fun\s+([A-Z][A-Za-z0-9_]*)\s*\([^)]*\)\s*(?::\s*UIViewController\b|=\s*ComposeUIViewController\b)',
+      r'fun\s+([A-Z][A-Za-z0-9_]*)\s*\(\s*\)\s*(?::\s*UIViewController\b|=\s*ComposeUIViewController\b)',
     );
     for (final file
         in iosMain
@@ -105,10 +92,7 @@ final class KmpEntryDiscovery {
             .whereType<File>()
             .where((f) => f.path.endsWith('.kt'))) {
       final source = file.readAsStringSync();
-      if (!source.contains('ComposeUIViewController') &&
-          !pattern.hasMatch(source)) {
-        continue;
-      }
+      if (!pattern.hasMatch(source)) continue;
       final basename = p.basenameWithoutExtension(file.path);
       final match = pattern.firstMatch(source);
       return ComposeEntryResult(
@@ -120,10 +104,7 @@ final class KmpEntryDiscovery {
     return null;
   }
 
-  ComposeEntryResult? _detectSwiftAppEntry(
-    String projectRoot,
-    String baseName,
-  ) {
+  ComposeEntryResult? _detectSwiftAppEntry(String projectRoot) {
     final iosApp = files.directory(p.join(projectRoot, 'iosApp'));
     if (!iosApp.existsSync()) return null;
     final allSwift = iosApp
@@ -161,8 +142,6 @@ final class KmpEntryDiscovery {
         imports.add(match.group(1)!);
       }
     }
-    final allowed = {..._allowedSwiftImports, baseName};
-    if (imports.any((import) => !allowed.contains(import))) return null;
     return ComposeEntryResult(
       KmpEntryKind.swiftApp,
       swiftAppDir: appDir,

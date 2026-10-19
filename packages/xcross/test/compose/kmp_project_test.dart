@@ -373,6 +373,52 @@ kotlin {
       expect(project.swiftImports, {'SwiftUI', 'Shared'});
     });
 
+    test(
+      'prefers Swift @main host with external imports over parameterized Kotlin entry',
+      () {
+        final root = _fixture();
+        _settings(root, 'include(":shared")');
+        _framework(root, 'shared', baseName: 'ComposeApp');
+        _kotlinParameterizedEntry(root, 'shared');
+        _swift(root, p.join('iosApp', 'StarlingIOSApp.swift'), '''
+import SwiftUI
+import ComposeApp
+import PythonRuntimeShim
+import CoreBluetooth
+import UniformTypeIdentifiers
+@main struct StarlingIOSApp: App { var body: some Scene { WindowGroup { Text("Starling") } } }
+''');
+
+        final project = session.detectKmpProject(root.path);
+
+        expect(project.entryKind, KmpEntryKind.swiftApp);
+        expect(project.entryClass, isNull);
+        expect(project.swiftImports, {
+          'SwiftUI',
+          'ComposeApp',
+          'PythonRuntimeShim',
+          'CoreBluetooth',
+          'UniformTypeIdentifiers',
+        });
+      },
+    );
+
+    test(
+      'does not treat a parameterized Kotlin controller as a runner entry',
+      () {
+        final root = _fixture();
+        _settings(root, 'include(":shared")');
+        _framework(root, 'shared', baseName: 'Shared');
+        _kotlinParameterizedEntry(root, 'shared');
+
+        final project = session.detectKmpProject(root.path);
+
+        expect(project.entryKind, KmpEntryKind.frameworkOnly);
+        expect(project.entryClass, isNull);
+        expect(project.entrySelector, isNull);
+      },
+    );
+
     test('detects committed Compose smoke examples', () {
       final compose = session.detectKmpProject(
         p.join(_repoRoot, 'examples', 'compose_app'),
@@ -626,6 +672,15 @@ void _kotlinEntry(Directory root, String module, {required String file}) {
   File(p.join(dir.path, file)).writeAsStringSync('''
 import androidx.compose.ui.window.ComposeUIViewController
 fun MainViewController() = ComposeUIViewController { }
+''');
+}
+
+void _kotlinParameterizedEntry(Directory root, String module) {
+  final dir = Directory(p.join(root.path, module, 'src', 'iosMain', 'kotlin'))
+    ..createSync(recursive: true);
+  File(p.join(dir.path, 'MainViewController.kt')).writeAsStringSync('''
+import androidx.compose.ui.window.ComposeUIViewController
+fun MainViewController(runtime: Any, documents: Any) = ComposeUIViewController { }
 ''');
 }
 
