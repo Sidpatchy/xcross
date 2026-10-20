@@ -214,6 +214,8 @@ void main() {
           '2acd3a2e0e5a9782b5cc2cb90c18f2412eda86ab3fb8adf2d18a3e3ca9b80ee6',
       '2.4.0':
           '9ef8c0f9fd90f4082d6e62f14655d23d81651d89d49205e5c49177ff34f552b8',
+      '2.4.20':
+          'b70d4fd2855fdb054fc9604beaa7de83c18d786454ae948de72a226e81f07dc8',
     }.entries) {
       test('pins macOS ARM64 ${entry.key} without an x64 overlay', () {
         final options = ComposeSetupOptions.resolve(
@@ -282,6 +284,54 @@ void main() {
         linux.overlayArchiveSha256,
         'da0684965d6f33c55b5e6e85b6de8a5327dbd3ccfedcb1ab6c1131900e8b3e83',
       );
+    });
+
+    test('pins Kotlin 2.4.20 artifacts for each supported host', () {
+      File(p.join(project.path, 'gradle', 'libs.versions.toml'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('kotlin = "2.4.20"\n');
+
+      final linux = ComposeSetupOptions.resolve(
+        env: {'HOME': home.path},
+        projectRoot: project.path,
+        host: session.hosts.linuxX64,
+      );
+      final windows = ComposeSetupOptions.resolve(
+        env: {'HOME': home.path, 'KN_VERSION': '2.4.20'},
+        projectRoot: project.path,
+        host: session.hosts.windowsX64,
+      );
+      final macosX64 = ComposeSetupOptions.resolve(
+        env: {'HOME': home.path, 'KN_VERSION': '2.4.20'},
+        projectRoot: project.path,
+        host: session.hosts.macosX64,
+      );
+      final macosArm64 = ComposeSetupOptions.resolve(
+        env: {'HOME': home.path, 'KN_VERSION': '2.4.20'},
+        projectRoot: project.path,
+        host: session.hosts.macosArm64,
+      );
+
+      expect(linux.version, '2.4.20');
+      expect(
+        linux.hostArchiveSha256,
+        '32d33c15c4da668a8d47a0ce2aea95be2c2cf8f5d1d65f6f4ed3697e4686dc7f',
+      );
+      expect(
+        windows.hostArchiveSha256,
+        '00e1b0ae0ce135f20db90007208cec3dc7b8c33cd6f489bae84d790349f04d93',
+      );
+      expect(
+        linux.overlayArchiveSha256,
+        'eecb7ecd392c092fca216602d468a49d4a820aaab480109d2c9ee104a9d97de3',
+      );
+      expect(windows.overlayArchiveSha256, linux.overlayArchiveSha256);
+      expect(macosX64.hostArchiveSha256, linux.overlayArchiveSha256);
+      expect(
+        macosArm64.hostArchiveSha256,
+        'b70d4fd2855fdb054fc9604beaa7de83c18d786454ae948de72a226e81f07dc8',
+      );
+      expect(macosArm64.overlayArchiveSha256, isNull);
     });
 
     test(
